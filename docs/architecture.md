@@ -66,31 +66,48 @@ flowchart LR
   SUP --> RC
   RC --> FIN[Finance/ERP]
   RC --> REP[Ops Dashboards/Exports]
-5) Data Flow (Flights example)
+## 5a) Data Flow (Hotels example)
+```mermaid
 sequenceDiagram
   participant ETL as ETL/Normalizer
   participant DS as Ops Data Lake
   participant ORCH as Orchestrator
-  participant DET as Flight Detector
+  participant DETH as Hotel Detector
   participant RAG as RAG Index
   participant EV as Evidence Builder
   participant POL as Policy Agent
   participant CL as Claims Agent
-  participant SUP as Supplier Portal
+  participant SUP as Hotel Portal/Email
   participant RC as Reconciliation
 
-  ETL->>DS: Load PNR + schedule change + ancillaries
-  ORCH->>DS: Fetch candidates
-  ORCH->>DET: Evaluate eligibility
-  DET->>RAG: Retrieve rules/waivers
-  DET->>ORCH: Emit potential entitlement
-  ORCH->>EV: Build proof pack (logs/screens/clause text)
-  EV->>POL: Validate policy/compliance
+  ETL->>DS: Load reservations + PMS/OTA events + comms logs
+  ORCH->>DS: Fetch candidates (stays with issues)
+  ORCH->>DETH: Evaluate SLA breach (downgrade/overbook/amenity/late room)
+  DETH->>RAG: Retrieve contract clause/compensation rules
+  DETH->>ORCH: Entitlement suggestion (amount, nights affected)
+  ORCH->>EV: Build proof (PMS snapshots, chat/email, photos, timestamps, clauses)
+  EV->>POL: Policy/legal check (thresholds, confidence, PII)
   POL-->>ORCH: Approved (amount, clause cited)
-  ORCH->>CL: Submit claim
-  CL->>SUP: Portal/API/email claim
+  ORCH->>CL: Submit claim (portal/API/email template)
+  CL->>SUP: Send packet + track SLA
   SUP-->>RC: Credit/Cash posted
-  RC-->>ORCH: Reconcile + close claim
+  RC-->>ORCH: Reconcile → ledger → close claim
+4a) Hotels SLA Detection (logic view)
+flowchart TD
+  A[Stay & PMS Events] --> B[Normalize & Correlate]
+  B --> C{Issue Detected?}
+  C -- No --> Z[Exit]
+  C -- Yes --> D[Hotel Detector]
+  D --> E[RAG: Contract/Rate Rules]
+  E --> F[Compute Entitlement]
+  F --> G[Evidence Builder]
+  G --> H[Policy/Legal Review]
+  H -- Reject --> Z
+  H -- Approve --> I[Claims Agent]
+  I --> J[Hotel Portal/API/Email]
+  J --> K[Reconciliation]
+  K --> L[Close Claim & Report]
+
 6) Agent Responsibilities
 Orchestrator: task routing, idempotency, backoff/retries, audit trail
 Detectors: domain-specific heuristics + LLM reasoning w/ citations
